@@ -1,4 +1,6 @@
 import User from '../models/User.js';
+import Project from '../models/Project.js';
+import Task from '../models/Task.js';
 import generateToken from '../utils/generateToken.js';
 
 // @desc    Register a new user
@@ -94,7 +96,45 @@ const getMe = async (req, res, next) => {
 // @access  Private/Admin
 const getUsers = async (req, res, next) => {
   try {
-    const users = await User.find({}).select('-password');
+    const { action, projectId } = req.query;
+    
+    let users = await User.find({}).select('-password');
+
+    // 1 member = 1 project
+    if (action === 'createProject') {
+      // Find all users who are currently in ANY project
+      const allProjects = await Project.find({});
+      const busyUserIds = new Set();
+      allProjects.forEach(p => {
+        p.teamMembers.forEach(memberId => busyUserIds.add(memberId.toString()));
+      });
+
+      // Filter out busy members (Admins can be added to multiple, but let's strictly restrict Members)
+      users = users.filter(user => user.role === 'Admin' || !busyUserIds.has(user._id.toString()));
+    }
+
+    // 1 member = 1 active task
+    if (action === 'createTask' && projectId) {
+      // Find the project to get its team members
+      const project = await Project.findById(projectId);
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      const teamMemberIds = project.teamMembers.map(id => id.toString());
+
+      // Find all tasks that are active (not Done)
+      const activeTasks = await Task.find({ status: { $ne: 'Done' } });
+      const busyUserIds = new Set(activeTasks.map(t => t.assignedTo?.toString()));
+
+      // Filter users: must be in the project, AND not busy (Admins are exempt from "busy" check? The prompt says "don't reflect profile of member who already have task". Admins aren't technically assigned tasks usually, but if they are, hide them too.)
+      users = users.filter(user => {
+        const isTeamMember = teamMemberIds.includes(user._id.toString());
+        const isBusy = busyUserIds.has(user._id.toString());
+        return isTeamMember && !isBusy;
+      });
+    }
+
     res.status(200).json(users);
   } catch (error) {
     next(error);

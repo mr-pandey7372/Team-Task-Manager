@@ -17,23 +17,42 @@ const TaskForm = ({ onSubmit, onCancel }) => {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProjects = async () => {
       try {
-        const [projectsData, usersData] = await Promise.all([
-          projectService.getProjects(),
-          userService.getUsers(),
-        ]);
+        const projectsData = await projectService.getProjects();
         setProjects(projectsData);
-        setUsers(usersData);
-        if (projectsData.length > 0) {
+        // If editing, initialData will set projectId, otherwise default to first project
+        if (projectsData.length > 0 && !formData.projectId) {
           setFormData((prev) => ({ ...prev, projectId: projectsData[0]._id }));
         }
       } catch (error) {
-        console.error('Failed to fetch data for task form', error);
+        console.error('Failed to fetch projects', error);
       }
     };
-    fetchData();
+    fetchProjects();
   }, []);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (formData.projectId) {
+        try {
+          const usersData = await userService.getUsers({ action: 'createTask', projectId: formData.projectId });
+          setUsers(usersData);
+          
+          // Reset assignedTo if the currently selected user is no longer in the fetched list
+          setFormData(prev => {
+            const isUserAvailable = usersData.some(u => u._id === prev.assignedTo);
+            return { ...prev, assignedTo: isUserAvailable ? prev.assignedTo : '' };
+          });
+        } catch (error) {
+          console.error('Failed to fetch users', error);
+        }
+      } else {
+        setUsers([]);
+      }
+    };
+    fetchUsers();
+  }, [formData.projectId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -136,6 +155,7 @@ const TaskForm = ({ onSubmit, onCancel }) => {
             name="dueDate"
             value={formData.dueDate}
             onChange={handleChange}
+            required
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 sm:text-sm"
           />
         </div>

@@ -12,6 +12,22 @@ const createProject = async (req, res, next) => {
       throw new Error('Please add name and description');
     }
 
+    // 1 member = 1 project validation
+    if (teamMembers && teamMembers.length > 0) {
+      const existingProjects = await Project.find({ _id: { $ne: req.params?.id } });
+      const busyUserIds = new Set();
+      existingProjects.forEach(p => {
+        p.teamMembers.forEach(memberId => busyUserIds.add(memberId.toString()));
+      });
+
+      for (const memberId of teamMembers) {
+        if (busyUserIds.has(memberId.toString())) {
+          res.status(400);
+          throw new Error('One or more selected members are already assigned to another project.');
+        }
+      }
+    }
+
     const project = await Project.create({
       name,
       description,
@@ -87,6 +103,23 @@ const updateProject = async (req, res, next) => {
     if (!project) {
       res.status(404);
       throw new Error('Project not found');
+    }
+
+    const { teamMembers } = req.body;
+    // 1 member = 1 project validation
+    if (teamMembers && teamMembers.length > 0) {
+      const existingProjects = await Project.find({ _id: { $ne: req.params.id } });
+      const busyUserIds = new Set();
+      existingProjects.forEach(p => {
+        p.teamMembers.forEach(memberId => busyUserIds.add(memberId.toString()));
+      });
+
+      for (const memberId of teamMembers) {
+        if (busyUserIds.has(memberId.toString())) {
+          res.status(400);
+          throw new Error('One or more selected members are already assigned to another project.');
+        }
+      }
     }
 
     project = await Project.findByIdAndUpdate(req.params.id, req.body, {

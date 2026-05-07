@@ -20,7 +20,7 @@ const ProjectForm = ({ initialData, onSubmit, onCancel }) => {
 
     const fetchUsers = async () => {
       try {
-        const data = await userService.getUsers();
+        const data = await userService.getUsers({ action: 'createProject' });
         setUsers(data);
       } catch (error) {
         console.error('Failed to fetch users', error);

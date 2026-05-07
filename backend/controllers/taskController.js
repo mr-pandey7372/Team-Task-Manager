@@ -7,9 +7,18 @@ const createTask = async (req, res, next) => {
   try {
     const { title, description, projectId, assignedTo, status, priority, dueDate } = req.body;
 
-    if (!title || !description || !projectId) {
+    if (!title || !description || !projectId || !dueDate) {
       res.status(400);
-      throw new Error('Please add title, description, and projectId');
+      throw new Error('Please add title, description, projectId, and due date');
+    }
+
+    // 1 active task per member validation
+    if (assignedTo) {
+      const activeTask = await Task.findOne({ assignedTo, status: { $ne: 'Done' } });
+      if (activeTask) {
+        res.status(400);
+        throw new Error('This member already has an active task and cannot be assigned another until it is completed.');
+      }
     }
 
     const task = await Task.create({

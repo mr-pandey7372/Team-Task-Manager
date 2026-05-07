@@ -1,7 +1,7 @@
 import api from './api';
 
-const getUsers = async () => {
-  const response = await api.get('/auth/users');
+const getUsers = async (params = {}) => {
+  const response = await api.get('/auth/users', { params });
   return response.data;
 };
 
